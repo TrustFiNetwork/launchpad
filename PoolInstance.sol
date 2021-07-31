@@ -186,6 +186,7 @@ contract PoolInstance {
     }
 
     function emergencyWithdraw() external nonReentrant {
+        require(block.number > endBlock, "not the right time");
         UserInfo storage user = userInfo[msg.sender];
         uint256 amountToTransfer = user.amount;
         user.amount = 0;
@@ -247,6 +248,7 @@ contract PoolInstance {
 
     function doFavorite() external {
         require(userFavorite[msg.sender] == false, "already favorite");
+        require(block.number <= endBlock, "already finish");
         userFavorite[msg.sender] = true;
         totalFavorite = totalFavorite.add(1);
         emit Favorite(msg.sender);
