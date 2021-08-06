@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.7.4;
+pragma solidity 0.7.6;
 
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
@@ -85,6 +85,11 @@ contract PoolInstance {
     ) external {
         require(!isInitialized, "Already initialized");
         require(msg.sender == FACTORY, "Only factory can do this");
+        require(address(_stakedToken) != address(0), "_stakedToken address cannot be 0"); 
+        require(address(_rewardToken) != address(0), "_rewardToken address cannot be 0"); 
+        require(_startBlock < _endBlock, "_startBlock is greater than _endBlock");
+        require(_startBlock >= block.number , "_startBlock is less than block.number"); 
+        require(_launchpads.length > 0 , "_launchpads's length can not be 0");
 
         isInitialized = true;
 
@@ -165,13 +170,13 @@ contract PoolInstance {
         console.log("block.number: ", block.number);
         require(block.number > endBlock, "not the right time");
         UserInfo storage user = userInfo[msg.sender];
-
+        require(user.amount > 0, "user's amount is 0");
         _updatePool();
 
         uint256 pending = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR).sub(user.rewardDebt);
         uint _amount = user.amount;
         if (_amount > 0) {
-            user.amount = user.amount.sub(_amount);
+            user.amount = 0;
             SafeERC20.safeTransfer(stakedToken, address(msg.sender), _amount);
         }
 
@@ -180,8 +185,8 @@ contract PoolInstance {
             emit Claim(msg.sender, pending);
         }
 
-        user.rewardDebt = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR);
-
+        user.rewardDebt = 0;
+        totalStake = totalStake.sub(_amount);
         emit Withdraw(msg.sender, _amount);
     }
 
@@ -195,7 +200,7 @@ contract PoolInstance {
         if (amountToTransfer > 0) {
             SafeERC20.safeTransfer(stakedToken, address(msg.sender), amountToTransfer);
         }
-
+        totalStake = totalStake.sub(amountToTransfer);
         emit EmergencyWithdraw(msg.sender, amountToTransfer);
     }
 
@@ -213,7 +218,7 @@ contract PoolInstance {
         }
     }
 
-    function claim(address _user) external {
+    function claim(address _user) external nonReentrant {
         UserInfo storage user = userInfo[_user];
 
         _updatePool();
@@ -229,14 +234,6 @@ contract PoolInstance {
         emit Claim(_user, pending);
     }
 
-    function totalVoteNum(address _user) external view returns (uint256) {
-        if (block.number < startBlock || block.number > endBlock) {
-            return 0;
-        }
-        UserInfo storage user = userInfo[_user];
-        return user.amount.sub(userVoted[_user]);
-    }
-
     function doVote(uint256 launchpad, uint256 num) internal {
         require(launchpad < launchpads.length, "illegal source");
         launchpadVoted[launchpad] = launchpadVoted[launchpad].add(num);
@@ -247,7 +244,7 @@ contract PoolInstance {
     }
 
     function doFavorite() external {
-        require(userFavorite[msg.sender] == false, "already favorite");
+        require(!userFavorite[msg.sender], "already favorite");
         require(block.number <= endBlock, "already finish");
         userFavorite[msg.sender] = true;
         totalFavorite = totalFavorite.add(1);

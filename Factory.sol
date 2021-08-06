@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.7.4;
+pragma solidity 0.7.6;
 
 import '@openzeppelin/contracts/token/ERC20/SafeERC20.sol';
 import '@openzeppelin/contracts/token/ERC20/ERC20.sol';
@@ -15,6 +15,7 @@ contract Factory is Ownable {
 
     address public vault;
     Collector public collector;
+    uint256 public constant MAX_LOCK_BLOCK_NUM = 604800;
 
     event VaultChanged(address oldVault, address newVault);
     event CollectorChanged(Collector oldCollector, Collector newCollector);
@@ -54,6 +55,7 @@ contract Factory is Ownable {
         uint256 _rewardPrice
     ) external onlyOwner {
         require(_endBlock > _startBlock, "endBlock must bigger than startBlock");
+        require(_endBlock <= _startBlock + MAX_LOCK_BLOCK_NUM, "illegal endBlock");
         require(_stakedToken.totalSupply() >= 0);
         require(_rewardToken.totalSupply() >= 0);
         uint rewardAmount = _endBlock.sub(_startBlock).mul(_rewardPerBlock);
